@@ -92,33 +92,47 @@ spec:
 
     stage('Build JAR') {
       steps {
-        container('maven') {
-          sh './mvnw -B -DskipTests package'
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE', message: 'BUILD_STAGE_FAILED') {
+          container('maven') {
+            sh './mvnw -B -DskipTests package'
+          }
         }
       }
     }
 
     stage('Build & push image') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
-        container('docker') {
-          withCredentials([usernamePassword(credentialsId: 'ghcr', usernameVariable: 'U', passwordVariable: 'P')]) {
-            sh 'echo "$P" | docker login ghcr.io -u "$U" --password-stdin'
-            sh 'docker build -t $IMAGE -f Dockerfile .'
-            sh 'docker push $IMAGE'
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE', message: 'BUILD_STAGE_FAILED') {
+          container('docker') {
+            withCredentials([usernamePassword(credentialsId: 'ghcr', usernameVariable: 'U', passwordVariable: 'P')]) {
+              sh 'echo "$P" | docker login ghcr.io -u "$U" --password-stdin'
+              sh 'docker build -t $IMAGE -f Dockerfile .'
+              sh 'docker push $IMAGE'
+            }
           }
         }
       }
     }
 
     stage('Trivy scan') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
         container('trivy') {
-          sh 'trivy fs --format json --output trivy.json --severity CRITICAL,HIGH,MEDIUM . || true'
+          sh '''
+            JAR=$(ls target/spring-petclinic-*.jar | head -n1)
+            trivy fs --format json --output trivy.json \
+              --severity CRITICAL,HIGH,MEDIUM \
+              --scanners vuln \
+              --skip-dirs .git \
+              "$JAR"
+          '''
         }
       }
     }
 
     stage('Upsert build: SUCCESS + security_issues') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
         upsert('build', [
           name         : "petclinic #${env.BUILD_NUMBER}",
@@ -137,6 +151,7 @@ spec:
     }
 
     stage('Upsert deployment: RUNNING') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
         upsert('deployment', [
           name       : "petclinic deploy #${env.BUILD_NUMBER}",
@@ -149,28 +164,35 @@ spec:
     }
 
     stage('kubectl apply + rollout status') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
-        container('kubectl') {
-          sh '''
-            sed "s|IMAGE_PLACEHOLDER|${IMAGE}|g" k8s/deploy.yaml \
-              | kubectl -n "${K8S_NAMESPACE}" apply -f -
-            kubectl -n "${K8S_NAMESPACE}" rollout status deploy/petclinic-demo --timeout=180s
-          '''
+        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE', message: 'DEPLOY_STAGE_FAILED') {
+          container('kubectl') {
+            sh '''
+              sed "s|IMAGE_PLACEHOLDER|${IMAGE}|g" k8s/deploy.yaml \
+                | kubectl -n "${K8S_NAMESPACE}" apply -f -
+              kubectl -n "${K8S_NAMESPACE}" rollout status deploy/petclinic-demo --timeout=180s
+            '''
+          }
         }
       }
     }
 
-    stage('Upsert deployment: SUCCESS') {
+    stage('Upsert deployment: outcome') {
+      when { expression { currentBuild.currentResult in ['SUCCESS', 'UNSTABLE'] } }
       steps {
-        upsert('deployment', [
-          name         : "petclinic deploy #${env.BUILD_NUMBER}",
-          status       : 'SUCCESS',
-          environment  : 'dev',
-          artifact     : env.IMAGE,
-          service      : 'petclinic',
-          durationInSec: (currentBuild.duration / 1000) as int,
-          url          : "http://petclinic-demo.${env.K8S_NAMESPACE}.svc:8080"
-        ])
+        script {
+          def deployOk = currentBuild.currentResult == 'SUCCESS'
+          upsert('deployment', [
+            name         : "petclinic deploy #${env.BUILD_NUMBER}",
+            status       : deployOk ? 'SUCCESS' : 'FAILED',
+            environment  : 'dev',
+            artifact     : env.IMAGE,
+            service      : 'petclinic',
+            durationInSec: (currentBuild.duration / 1000) as int,
+            url          : "http://petclinic-demo.${env.K8S_NAMESPACE}.svc:8080"
+          ])
+        }
       }
     }
   }
@@ -187,13 +209,6 @@ spec:
           buildNumber  : env.BUILD_NUMBER.toInteger(),
           triggeredBy  : (env.BUILD_USER ?: 'scm'),
           url          : env.BUILD_URL
-        ])
-        upsert('deployment', [
-          name       : "petclinic deploy #${env.BUILD_NUMBER}",
-          status     : 'FAILED',
-          environment: 'dev',
-          artifact   : env.IMAGE,
-          service    : 'petclinic'
         ])
       }
     }

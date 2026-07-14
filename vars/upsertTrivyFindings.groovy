@@ -33,8 +33,19 @@ def call(String trivyJsonPath, String idBase) {
   }
 
   if (records.isEmpty()) {
-    echo "Trivy report contained no vulnerabilities — skipping security_issues upsert."
-    return
+    records << [
+      identifier    : "${idBase}-clean",
+      name          : "Trivy scan clean for petclinic #${env.BUILD_NUMBER}",
+      timestamp     : env.ISO_TS,
+      service       : 'petclinic',
+      entity_ref    : env.IDP_ENTITY_REF,
+      severity      : 'INFO',
+      status        : 'RESOLVED',
+      type          : 'VULNERABILITY',
+      rule          : 'trivy:scan-clean',
+      toolName      : 'trivy'
+    ]
+    echo "Trivy report contained no vulnerabilities — posting scan-clean marker record."
   }
 
   withCredentials([
