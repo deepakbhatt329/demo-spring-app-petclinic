@@ -44,6 +44,9 @@ def call(String trivyJsonPath, String idBase) {
   ]) {
     def body = JsonOutput.toJson([records: records])
     def url  = "${env.HARNESS_IM_URL}/api/v1/accounts/${env.HARNESS_ACCOUNT_ID}/integrations/${env.IID}/data/security_issues"
+
+    echo "--- upsert(security_issues) payload (${records.size()} records) ---\n${JsonOutput.prettyPrint(body)}\n--- end ---"
+
     httpRequest(
       url:                url,
       httpMode:           'POST',

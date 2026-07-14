@@ -40,6 +40,8 @@ def call(String kind, Map extras) {
     def body = JsonOutput.toJson([records: [record]])
     def url  = "${env.HARNESS_IM_URL}/api/v1/accounts/${env.HARNESS_ACCOUNT_ID}/integrations/${env.IID}/data/${kind}"
 
+    echo "--- upsert(${kind}) payload ---\n${JsonOutput.prettyPrint(body)}\n--- end ---"
+
     httpRequest(
       url:                url,
       httpMode:           'POST',

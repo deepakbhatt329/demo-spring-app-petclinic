@@ -30,7 +30,7 @@ spec:
       envFrom:
         - secretRef: { name: harness-idp-secrets }
     - name: kubectl
-      image: bitnami/kubectl:latest
+      image: alpine/k8s:1.29.2
       command: [cat]
       tty: true
       envFrom:
