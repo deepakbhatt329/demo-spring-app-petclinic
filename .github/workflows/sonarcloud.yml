@@ -100,7 +100,9 @@ jobs:
               maintainabilityRating: toRating("sqale_rating")
             }]}
             ')
+          echo "--- upsert(quality) payload ---"
           echo "$BODY" | jq .
+          echo "--- end ---"
           curl -sSf -X POST \
             -H "Authorization: Bearer ${HARNESS_API_KEY}" \
             -H "Content-Type: application/json" \

@@ -94,7 +94,9 @@ jobs:
               echo "Unsupported event: $EVENT_NAME"; exit 0 ;;
           esac
           echo "$BODY" > body.json
+          echo "--- upsert(custom) payload ---"
           jq . body.json
+          echo "--- end ---"
       - name: POST to IM /data/custom
         env:
           HARNESS_IM_URL:     ${{ secrets.HARNESS_IM_URL }}
