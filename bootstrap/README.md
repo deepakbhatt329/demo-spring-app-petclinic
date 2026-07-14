@@ -63,6 +63,7 @@ gh secret set HARNESS_ACCOUNT_ID  --body "$HARNESS_ACCOUNT_ID"  --repo deepakbha
 gh secret set HARNESS_IM_URL      --body "$HARNESS_IM_URL"      --repo deepakbhatt329/demo-spring-app-petclinic
 gh secret set IID_QUALITY         --body "$IID_QUALITY"         --repo deepakbhatt329/demo-spring-app-petclinic
 gh secret set IID_CUSTOM          --body "$IID_CUSTOM"          --repo deepakbhatt329/demo-spring-app-petclinic
+gh secret set IDP_ENTITY_REF      --body "$IDP_ENTITY_REF"      --repo deepakbhatt329/demo-spring-app-petclinic
 ```
 
 ## Demo runbook

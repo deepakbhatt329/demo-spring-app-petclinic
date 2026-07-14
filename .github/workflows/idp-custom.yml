@@ -20,7 +20,7 @@ jobs:
         id: build
         env:
           EVENT_NAME: ${{ github.event_name }}
-          IDP_ENTITY_REF: component:default/petclinic-demo
+          IDP_ENTITY_REF: ${{ secrets.IDP_ENTITY_REF }}
           REPO: ${{ github.repository }}
           EVENT_PATH: ${{ github.event_path }}
         run: |

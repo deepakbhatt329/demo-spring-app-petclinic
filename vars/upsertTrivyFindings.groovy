@@ -6,6 +6,10 @@ def call(String trivyJsonPath, String idBase) {
     return
   }
 
+  if (!env.IDP_ENTITY_REF) {
+    error "upsertTrivyFindings(): IDP_ENTITY_REF env var is not set (populate it in bootstrap/demo.env)"
+  }
+
   def report = readJSON file: trivyJsonPath
   def records = []
   (report.Results ?: []).each { result ->
@@ -15,7 +19,7 @@ def call(String trivyJsonPath, String idBase) {
         name          : "${v.VulnerabilityID} in ${v.PkgName}",
         timestamp     : env.ISO_TS,
         service       : 'petclinic',
-        entity_ref    : env.IDP_ENTITY_REF ?: 'component:default/petclinic-demo',
+        entity_ref    : env.IDP_ENTITY_REF,
         url           : v.PrimaryURL ?: '',
         severity      : (v.Severity ?: 'MEDIUM'),
         status        : 'OPEN',

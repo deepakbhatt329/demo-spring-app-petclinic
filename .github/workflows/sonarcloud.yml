@@ -65,7 +65,7 @@ jobs:
           HARNESS_API_KEY:      ${{ secrets.HARNESS_API_KEY }}
           IID_QUALITY:          ${{ secrets.IID_QUALITY }}
           SONAR_PROJECT_KEY:    ${{ secrets.SONAR_PROJECT_KEY }}
-          IDP_ENTITY_REF:       component:default/petclinic-demo
+          IDP_ENTITY_REF:       ${{ secrets.IDP_ENTITY_REF }}
         run: |
           set -euo pipefail
           RATING_MAP='{"1.0":"A","2.0":"B","3.0":"C","4.0":"D","5.0":"E"}'

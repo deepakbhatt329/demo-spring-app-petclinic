@@ -27,10 +27,14 @@ def call(String kind, Map extras) {
       error "upsert(): no identifier resolved for kind '${kind}'"
     }
 
+    if (!env.IDP_ENTITY_REF) {
+      error "upsert(): IDP_ENTITY_REF env var is not set (populate it in bootstrap/demo.env)"
+    }
+
     def record = [
       identifier: identifier,
       timestamp : env.ISO_TS,
-      entity_ref: env.IDP_ENTITY_REF ?: 'component:default/petclinic-demo'
+      entity_ref: env.IDP_ENTITY_REF
     ] + extras
 
     def body = JsonOutput.toJson([records: [record]])

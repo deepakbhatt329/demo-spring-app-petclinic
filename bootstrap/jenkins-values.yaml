@@ -17,10 +17,6 @@ controller:
     app: jenkins
     team: idp-demo
 
-  containerEnv:
-    - name: IDP_ENTITY_REF
-      value: "component:default/petclinic-demo"
-
   containerEnvFrom:
     - secretRef:
         name: harness-idp-secrets
@@ -49,11 +45,6 @@ controller:
       demo-config: |
         jenkins:
           systemMessage: "IDP Custom Integration demo — provisioned via JCasC"
-          globalNodeProperties:
-            - envVars:
-                env:
-                  - key: IDP_ENTITY_REF
-                    value: "component:default/petclinic-demo"
         credentials:
           system:
             domainCredentials:
