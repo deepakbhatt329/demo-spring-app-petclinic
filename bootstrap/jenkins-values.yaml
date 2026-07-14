@@ -1,38 +1,47 @@
 controller:
   installPlugins:
-    - kubernetes:4283.v87f2b_5b_9f8a_a
-    - workflow-aggregator:600.vb_57cdd26fbf1
-    - git:5.2.2
-    - configuration-as-code:1836.vccda_4a_122a_a_e
-    - job-dsl:1.87
-    - credentials-binding:687.v619cb_15e923f
-    - http_request:1.19
-    - pipeline-utility-steps:2.19.0
-    - workflow-cps-global-lib:609.vd95673f149b_b
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - configuration-as-code
+    - job-dsl
+    - credentials-binding
+    - http_request
+    - pipeline-utility-steps
+    - pipeline-groovy-lib
+    - timestamper
 
   serviceType: ClusterIP
 
-  additionalExistingSecrets:
-    - name: harness-idp-secrets
-      keyName: HARNESS_IM_URL
-    - name: harness-idp-secrets
-      keyName: HARNESS_ACCOUNT_ID
-    - name: harness-idp-secrets
-      keyName: HARNESS_API_KEY
-    - name: harness-idp-secrets
-      keyName: IID_BUILD
-    - name: harness-idp-secrets
-      keyName: IID_DEPLOYMENT
-    - name: harness-idp-secrets
-      keyName: IID_QUALITY
-    - name: harness-idp-secrets
-      keyName: IID_SECURITY
-    - name: harness-idp-secrets
-      keyName: IID_CUSTOM
-    - name: harness-idp-secrets
-      keyName: GHCR_USERNAME
-    - name: harness-idp-secrets
-      keyName: GHCR_TOKEN
+  podLabels:
+    app: jenkins
+    team: idp-demo
+
+  containerEnv:
+    - name: IDP_ENTITY_REF
+      value: "component:default/petclinic-demo"
+
+  containerEnvFrom:
+    - secretRef:
+        name: harness-idp-secrets
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  sidecars:
+    configAutoReload:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
 
   JCasC:
     defaultConfig: true
@@ -40,6 +49,11 @@ controller:
       demo-config: |
         jenkins:
           systemMessage: "IDP Custom Integration demo — provisioned via JCasC"
+          globalNodeProperties:
+            - envVars:
+                env:
+                  - key: IDP_ENTITY_REF
+                    value: "component:default/petclinic-demo"
         credentials:
           system:
             domainCredentials:
@@ -91,13 +105,6 @@ controller:
                     scm:
                       git:
                         remote: "https://github.com/deepakbhatt329/demo-spring-app-petclinic.git"
-          location:
-            url: "http://jenkins.custom-integrartion-ipd-demo.svc:8080/"
-          envInject:
-            all:
-              HARNESS_IM_URL: "${HARNESS_IM_URL}"
-              HARNESS_ACCOUNT_ID: "${HARNESS_ACCOUNT_ID}"
-              IDP_ENTITY_REF: "component:default/petclinic-demo"
         jobs:
           - script: >
               pipelineJob('petclinic') {
@@ -119,6 +126,16 @@ agent:
   enabled: true
   namespace: custom-integrartion-ipd-demo
   podRetention: OnFailure
+  podLabels:
+    app: jenkins-agent
+    team: idp-demo
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
 
 persistence:
   enabled: true
