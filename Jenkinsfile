@@ -13,24 +13,34 @@ spec:
       image: jenkins/inbound-agent:latest
       resources:
         requests: { memory: 256Mi, cpu: 200m }
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
     - name: docker
       image: docker:24-cli
       command: [cat]
       tty: true
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
       volumeMounts:
         - { name: dockersock, mountPath: /var/run/docker.sock }
     - name: trivy
       image: aquasec/trivy:0.60.0
       command: [cat]
       tty: true
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
     - name: kubectl
       image: bitnami/kubectl:latest
       command: [cat]
       tty: true
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
     - name: maven
       image: maven:3.9-eclipse-temurin-17
       command: [cat]
       tty: true
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
   volumes:
     - name: dockersock
       hostPath: { path: /var/run/docker.sock }
