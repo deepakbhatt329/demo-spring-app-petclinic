@@ -1,0 +1,110 @@
+name: IDP custom entity forwarder
+
+on:
+  pull_request:
+    types: [opened, closed, reopened, synchronize]
+  issues:
+    types: [opened, closed, reopened, edited]
+  release:
+    types: [published, edited]
+  workflow_dispatch: {}
+
+jobs:
+  forward-custom:
+    name: POST custom record to IM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Build record for ${{ github.event_name }}
+        id: build
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IDP_ENTITY_REF: component:default/petclinic-demo
+          REPO: ${{ github.repository }}
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          case "$EVENT_NAME" in
+            pull_request)
+              PR_NUM=$(jq -r '.pull_request.number' "$EVENT_PATH")
+              PR_TITLE=$(jq -r '.pull_request.title' "$EVENT_PATH")
+              PR_AUTHOR=$(jq -r '.pull_request.user.login' "$EVENT_PATH")
+              PR_MERGED=$(jq -r '.pull_request.merged' "$EVENT_PATH")
+              PR_STATE=$(jq -r '.pull_request.state' "$EVENT_PATH")
+              PR_ACTION=$(jq -r '.action' "$EVENT_PATH")
+              STATUS="open"
+              if [ "$PR_MERGED" = "true" ]; then
+                STATUS="merged"
+              elif [ "$PR_STATE" = "closed" ]; then
+                STATUS="closed"
+              elif [ "$PR_ACTION" = "reopened" ]; then
+                STATUS="open"
+              fi
+              BODY=$(jq -n \
+                --arg id "pr-${REPO//\//-}-${PR_NUM}" \
+                --arg name "$PR_TITLE" \
+                --arg ts "$TS" \
+                --arg ref "$IDP_ENTITY_REF" \
+                --arg repo "$REPO" \
+                --argjson prNumber "$PR_NUM" \
+                --arg author "$PR_AUTHOR" \
+                --arg status "$STATUS" \
+                '{records:[{identifier:$id,name:$name,timestamp:$ts,entity_ref:$ref,type:"pull_request",tags:{repo:$repo},prNumber:$prNumber,author:$author,status:$status}]}')
+              ;;
+            issues)
+              ISSUE_NUM=$(jq -r '.issue.number' "$EVENT_PATH")
+              ISSUE_TITLE=$(jq -r '.issue.title' "$EVENT_PATH")
+              ISSUE_AUTHOR=$(jq -r '.issue.user.login' "$EVENT_PATH")
+              ISSUE_STATE=$(jq -r '.issue.state' "$EVENT_PATH")
+              BODY=$(jq -n \
+                --arg id "issue-${REPO//\//-}-${ISSUE_NUM}" \
+                --arg name "$ISSUE_TITLE" \
+                --arg ts "$TS" \
+                --arg ref "$IDP_ENTITY_REF" \
+                --arg repo "$REPO" \
+                --argjson issueNumber "$ISSUE_NUM" \
+                --arg author "$ISSUE_AUTHOR" \
+                --arg status "$ISSUE_STATE" \
+                '{records:[{identifier:$id,name:$name,timestamp:$ts,entity_ref:$ref,type:"issue",tags:{repo:$repo},issueNumber:$issueNumber,author:$author,status:$status}]}')
+              ;;
+            release)
+              REL_TAG=$(jq -r '.release.tag_name' "$EVENT_PATH")
+              REL_NAME=$(jq -r '.release.name // .release.tag_name' "$EVENT_PATH")
+              REL_AUTHOR=$(jq -r '.release.author.login' "$EVENT_PATH")
+              BODY=$(jq -n \
+                --arg id "release-${REPO//\//-}-${REL_TAG}" \
+                --arg name "$REL_NAME" \
+                --arg ts "$TS" \
+                --arg ref "$IDP_ENTITY_REF" \
+                --arg repo "$REPO" \
+                --arg tag "$REL_TAG" \
+                --arg author "$REL_AUTHOR" \
+                '{records:[{identifier:$id,name:$name,timestamp:$ts,entity_ref:$ref,type:"release",tags:{repo:$repo,tag:$tag},author:$author,status:"published"}]}')
+              ;;
+            workflow_dispatch)
+              BODY=$(jq -n \
+                --arg id "manual-$(date +%s)" \
+                --arg ts "$TS" \
+                --arg ref "$IDP_ENTITY_REF" \
+                '{records:[{identifier:$id,name:"manual dispatch",timestamp:$ts,entity_ref:$ref,type:"manual"}]}')
+              ;;
+            *)
+              echo "Unsupported event: $EVENT_NAME"; exit 0 ;;
+          esac
+          echo "$BODY" > body.json
+          jq . body.json
+      - name: POST to IM /data/custom
+        env:
+          HARNESS_IM_URL:     ${{ secrets.HARNESS_IM_URL }}
+          HARNESS_ACCOUNT_ID: ${{ secrets.HARNESS_ACCOUNT_ID }}
+          HARNESS_API_KEY:    ${{ secrets.HARNESS_API_KEY }}
+          IID_CUSTOM:         ${{ secrets.IID_CUSTOM }}
+        run: |
+          set -euo pipefail
+          curl -sSf -X POST \
+            -H "Authorization: Bearer ${HARNESS_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "${HARNESS_IM_URL}/api/v1/accounts/${HARNESS_ACCOUNT_ID}/integrations/${IID_CUSTOM}/data/custom" \
+            --data-binary "@body.json"
