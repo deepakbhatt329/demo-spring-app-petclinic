@@ -79,13 +79,15 @@ spec:
       steps {
         upsert('build', [
           name         : "petclinic #${env.BUILD_NUMBER}",
+          type         : 'DockerBuild',
           status       : 'RUNNING',
           branch       : (env.BRANCH_NAME ?: 'main'),
           sha          : env.GIT_SHA,
           repositoryUrl: env.REPO_URL,
           buildNumber  : env.BUILD_NUMBER.toInteger(),
           triggeredBy  : (env.BUILD_USER ?: 'scm'),
-          url          : env.BUILD_URL
+          url          : env.BUILD_URL,
+          tags         : [runner: 'kubernetes', registry: 'ghcr.io']
         ])
       }
     }
@@ -136,6 +138,7 @@ spec:
       steps {
         upsert('build', [
           name         : "petclinic #${env.BUILD_NUMBER}",
+          type         : 'DockerBuild',
           status       : 'SUCCESS',
           branch       : (env.BRANCH_NAME ?: 'main'),
           sha          : env.GIT_SHA,
@@ -144,7 +147,8 @@ spec:
           artifact     : [env.IMAGE],
           url          : env.BUILD_URL,
           buildNumber  : env.BUILD_NUMBER.toInteger(),
-          triggeredBy  : (env.BUILD_USER ?: 'scm')
+          triggeredBy  : (env.BUILD_USER ?: 'scm'),
+          tags         : [runner: 'kubernetes', registry: 'ghcr.io']
         ])
         upsertTrivyFindings('trivy.json', env.SECURITY_ID_BASE)
       }
@@ -155,10 +159,12 @@ spec:
       steps {
         upsert('deployment', [
           name       : "petclinic deploy #${env.BUILD_NUMBER}",
+          type       : 'DEPLOYMENT',
           status     : 'RUNNING',
           environment: 'dev',
           artifact   : env.IMAGE,
-          service    : 'petclinic'
+          service    : 'petclinic',
+          tags       : [namespace: env.K8S_NAMESPACE]
         ])
       }
     }
@@ -185,12 +191,14 @@ spec:
           def deployOk = currentBuild.currentResult == 'SUCCESS'
           upsert('deployment', [
             name         : "petclinic deploy #${env.BUILD_NUMBER}",
+            type         : 'DEPLOYMENT',
             status       : deployOk ? 'SUCCESS' : 'FAILED',
             environment  : 'dev',
             artifact     : env.IMAGE,
             service      : 'petclinic',
             durationInSec: (currentBuild.duration / 1000) as int,
-            url          : "http://petclinic-demo.${env.K8S_NAMESPACE}.svc:8080"
+            url          : "http://petclinic-demo.${env.K8S_NAMESPACE}.svc:8080",
+            tags         : [namespace: env.K8S_NAMESPACE]
           ])
         }
       }
@@ -202,13 +210,15 @@ spec:
       script {
         upsert('build', [
           name         : "petclinic #${env.BUILD_NUMBER}",
+          type         : 'DockerBuild',
           status       : 'FAILED',
           branch       : (env.BRANCH_NAME ?: 'main'),
           sha          : env.GIT_SHA,
           repositoryUrl: env.REPO_URL,
           buildNumber  : env.BUILD_NUMBER.toInteger(),
           triggeredBy  : (env.BUILD_USER ?: 'scm'),
-          url          : env.BUILD_URL
+          url          : env.BUILD_URL,
+          tags         : [runner: 'kubernetes', registry: 'ghcr.io']
         ])
       }
     }

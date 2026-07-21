@@ -27,7 +27,8 @@ def call(String trivyJsonPath, String idBase) {
         rule          : 'trivy:cve',
         cve           : v.VulnerabilityID,
         packageVersion: "${v.PkgName}@${v.InstalledVersion}",
-        toolName      : 'trivy'
+        toolName      : 'trivy',
+        tags          : [scanner: 'trivy', pkgType: (result.Type ?: 'unknown')]
       ]
     }
   }
@@ -43,7 +44,8 @@ def call(String trivyJsonPath, String idBase) {
       status        : 'RESOLVED',
       type          : 'VULNERABILITY',
       rule          : 'trivy:scan-clean',
-      toolName      : 'trivy'
+      toolName      : 'trivy',
+      tags          : [scanner: 'trivy']
     ]
     echo "Trivy report contained no vulnerabilities — posting scan-clean marker record."
   }
