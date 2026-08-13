@@ -46,7 +46,7 @@ def call(String kind, Map extras) {
       url:                url,
       httpMode:           'POST',
       contentType:        'APPLICATION_JSON',
-      customHeaders:      [[name: 'Authorization', value: "Bearer ${env.HARNESS_API_KEY}"]],
+      customHeaders:      [[name: 'x-api-key', value: "${env.HARNESS_API_KEY}"]],
       requestBody:        body,
       validResponseCodes: '202'
     )
