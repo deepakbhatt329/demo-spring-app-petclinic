@@ -135,12 +135,7 @@ spec:
                 --project petclinic \
                 --scan target/ \
                 --format JSON \
-                --out odc-report/ \
-                --disableAssembly \
-                --disableNodeJS \
-                --disablePyDist \
-                --disablePyPkg \
-                --disableRubyGems
+                --out odc-report/
             '''
           }
         }

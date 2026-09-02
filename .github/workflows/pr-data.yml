@@ -1,0 +1,97 @@
+name: PR data → Harness IDP
+
+on:
+  pull_request:
+    types: [opened, synchronize, closed]
+
+jobs:
+  forward-pr:
+    name: POST PR record to IDP
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Fetch PR details from GitHub API
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR=$(gh api /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }})
+
+          COMMITS=$(echo "$PR"   | jq '.commits')
+          ADDITIONS=$(echo "$PR" | jq '.additions')
+          DELETIONS=$(echo "$PR" | jq '.deletions')
+          MERGED=$(echo "$PR"    | jq -r '.merged')
+          STATE=$(echo "$PR"     | jq -r '.state')
+
+          if [ "$MERGED" = "true" ]; then
+            STATUS="merged"
+          elif [ "$STATE" = "closed" ]; then
+            STATUS="closed"
+          else
+            STATUS="open"
+          fi
+
+          echo "commits=$COMMITS"                        >> "$GITHUB_OUTPUT"
+          echo "lines_changed=+${ADDITIONS}|-${DELETIONS}" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS"                          >> "$GITHUB_OUTPUT"
+          echo "state=$STATE"                            >> "$GITHUB_OUTPUT"
+
+      - name: POST to Harness IDP
+        env:
+          HARNESS_IM_URL:     ${{ secrets.HARNESS_IM_URL }}
+          HARNESS_ACCOUNT_ID: ${{ secrets.HARNESS_ACCOUNT_ID }}
+          HARNESS_API_KEY:    ${{ secrets.HARNESS_API_KEY }}
+          IID_PR:             ${{ secrets.IID_PR }}
+          IDP_ENTITY_REF:     ${{ secrets.IDP_ENTITY_REF }}
+        run: |
+          set -euo pipefail
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+          REPO_NAME="${REPO##*/}"
+
+          BODY=$(jq -n \
+            --arg id       "pr-${REPO//\//-}-${PR_NUM}" \
+            --arg name     "${{ github.event.pull_request.title }}" \
+            --arg ts       "$TS" \
+            --arg ref      "$IDP_ENTITY_REF" \
+            --arg service  "$REPO_NAME" \
+            --arg author   "${{ github.event.pull_request.user.login }}" \
+            --arg lines    "${{ steps.pr.outputs.lines_changed }}" \
+            --arg status   "${{ steps.pr.outputs.status }}" \
+            --arg state    "${{ steps.pr.outputs.state }}" \
+            --arg url      "${{ github.event.pull_request.html_url }}" \
+            --argjson pr_num  $PR_NUM \
+            --argjson commits ${{ steps.pr.outputs.commits }} \
+            '{records:[{
+              identifier:   $id,
+              name:         $name,
+              timestamp:    $ts,
+              entity_ref:   $ref,
+              service:      $service,
+              author:       $author,
+              commits:      $commits,
+              linesChanged: $lines,
+              status:       $status,
+              state:        $state,
+              prNumber:     $pr_num,
+              url:          $url,
+              tags:         {repo: $service, branch: "${{ github.head_ref }}"}
+            }]}')
+
+          echo "--- upsert(pr) payload ---"
+          echo "$BODY" | jq .
+          echo "--- end ---"
+
+          HTTP_CODE=$(curl -sS -o /tmp/im-resp -w "%{http_code}" -X POST \
+            -H "x-api-key: ${HARNESS_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "${HARNESS_IM_URL}/api/v1/accounts/${HARNESS_ACCOUNT_ID}/integrations/${IID_PR}/data/pull_request" \
+            -d "$BODY")
+          echo "IM response (${HTTP_CODE}):"
+          cat /tmp/im-resp; echo
+          [ "$HTTP_CODE" = "202" ] || exit 1

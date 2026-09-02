@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PullRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["identifier", "timestamp"],
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "description": "Unique PR identifier, e.g. pr-{repo}-{number}"
+    },
+    "name": {
+      "type": ["string", "null"],
+      "description": "PR title"
+    },
+    "timestamp": {
+      "type": ["string", "null"],
+      "description": "Event timestamp in ISO 8601 format"
+    },
+    "entity_ref": {
+      "type": ["string", "null"],
+      "description": "Entity reference for IDP catalog"
+    },
+    "author": {
+      "type": ["string", "null"],
+      "description": "GitHub login of the PR author"
+    },
+    "commits": {
+      "type": ["integer", "null"],
+      "description": "Number of commits in the PR"
+    },
+    "linesChanged": {
+      "type": ["string", "null"],
+      "description": "Lines added and removed, e.g. +908|-332"
+    },
+    "state": {
+      "type": ["string", "null"],
+      "description": "PR state: opened, closed, merged"
+    },
+    "status": {
+      "type": ["string", "null"],
+      "description": "PR status: open, closed, merged"
+    },
+    "prNumber": {
+      "type": ["integer", "null"],
+      "description": "PR number in the repository"
+    },
+    "url": {
+      "type": ["string", "null"],
+      "description": "Link to the PR"
+    },
+    "tags": {
+      "type": ["object", "null"],
+      "description": "Arbitrary key-value strings for additional context",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

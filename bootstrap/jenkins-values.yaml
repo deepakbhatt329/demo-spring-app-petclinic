@@ -77,6 +77,10 @@ controller:
                       secret: "${IID_SECURITY}"
                   - string:
                       scope: GLOBAL
+                      id: iid-security-scan
+                      secret: "${IID_SECURITY_SCAN}"
+                  - string:
+                      scope: GLOBAL
                       id: iid-custom
                       secret: "${IID_CUSTOM}"
                   - usernamePassword:

@@ -22,7 +22,7 @@ command -v kubectl >/dev/null || die "kubectl not found on PATH"
 command -v helm    >/dev/null || die "helm not found on PATH"
 [[ -f "$ENV_FILE" ]] || die "bootstrap/demo.env missing (copy from demo.env.example)"
 
-REQUIRED=(HARNESS_IM_URL HARNESS_ACCOUNT_ID HARNESS_API_KEY IID_BUILD IID_DEPLOYMENT IID_QUALITY IID_SECURITY IID_CUSTOM GHCR_USERNAME GHCR_TOKEN IDP_ENTITY_REF)
+REQUIRED=(HARNESS_IM_URL HARNESS_ACCOUNT_ID HARNESS_API_KEY IID_BUILD IID_DEPLOYMENT IID_QUALITY IID_SECURITY IID_SECURITY_SCAN IID_CUSTOM GHCR_USERNAME GHCR_TOKEN IDP_ENTITY_REF)
 set -a; source "$ENV_FILE"; set +a
 for v in "${REQUIRED[@]}"; do
   val="${!v-}"
