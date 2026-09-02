@@ -22,18 +22,17 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           IDP_ENTITY_REF: ${{ secrets.IDP_ENTITY_REF }}
           REPO: ${{ github.repository }}
-          EVENT_PATH: ${{ github.event_path }}
         run: |
           set -euo pipefail
           TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           case "$EVENT_NAME" in
             pull_request)
-              PR_NUM=$(jq -r '.pull_request.number' "$EVENT_PATH")
-              PR_TITLE=$(jq -r '.pull_request.title' "$EVENT_PATH")
-              PR_AUTHOR=$(jq -r '.pull_request.user.login' "$EVENT_PATH")
-              PR_MERGED=$(jq -r '.pull_request.merged' "$EVENT_PATH")
-              PR_STATE=$(jq -r '.pull_request.state' "$EVENT_PATH")
-              PR_ACTION=$(jq -r '.action' "$EVENT_PATH")
+              PR_NUM=$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")
+              PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+              PR_AUTHOR=$(jq -r '.pull_request.user.login' "$GITHUB_EVENT_PATH")
+              PR_MERGED=$(jq -r '.pull_request.merged' "$GITHUB_EVENT_PATH")
+              PR_STATE=$(jq -r '.pull_request.state' "$GITHUB_EVENT_PATH")
+              PR_ACTION=$(jq -r '.action' "$GITHUB_EVENT_PATH")
               STATUS="open"
               if [ "$PR_MERGED" = "true" ]; then
                 STATUS="merged"
@@ -54,10 +53,10 @@ jobs:
                 '{records:[{identifier:$id,name:$name,timestamp:$ts,entity_ref:$ref,type:"pull_request",tags:{repo:$repo},prNumber:$prNumber,author:$author,status:$status}]}')
               ;;
             issues)
-              ISSUE_NUM=$(jq -r '.issue.number' "$EVENT_PATH")
-              ISSUE_TITLE=$(jq -r '.issue.title' "$EVENT_PATH")
-              ISSUE_AUTHOR=$(jq -r '.issue.user.login' "$EVENT_PATH")
-              ISSUE_STATE=$(jq -r '.issue.state' "$EVENT_PATH")
+              ISSUE_NUM=$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")
+              ISSUE_TITLE=$(jq -r '.issue.title' "$GITHUB_EVENT_PATH")
+              ISSUE_AUTHOR=$(jq -r '.issue.user.login' "$GITHUB_EVENT_PATH")
+              ISSUE_STATE=$(jq -r '.issue.state' "$GITHUB_EVENT_PATH")
               BODY=$(jq -n \
                 --arg id "issue-${REPO//\//-}-${ISSUE_NUM}" \
                 --arg name "$ISSUE_TITLE" \
@@ -70,9 +69,9 @@ jobs:
                 '{records:[{identifier:$id,name:$name,timestamp:$ts,entity_ref:$ref,type:"issue",tags:{repo:$repo},issueNumber:$issueNumber,author:$author,status:$status}]}')
               ;;
             release)
-              REL_TAG=$(jq -r '.release.tag_name' "$EVENT_PATH")
-              REL_NAME=$(jq -r '.release.name // .release.tag_name' "$EVENT_PATH")
-              REL_AUTHOR=$(jq -r '.release.author.login' "$EVENT_PATH")
+              REL_TAG=$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")
+              REL_NAME=$(jq -r '.release.name // .release.tag_name' "$GITHUB_EVENT_PATH")
+              REL_AUTHOR=$(jq -r '.release.author.login' "$GITHUB_EVENT_PATH")
               BODY=$(jq -n \
                 --arg id "release-${REPO//\//-}-${REL_TAG}" \
                 --arg name "$REL_NAME" \
