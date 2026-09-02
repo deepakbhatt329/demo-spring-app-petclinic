@@ -1,0 +1,149 @@
+controller:
+  installPlugins:
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - configuration-as-code
+    - job-dsl
+    - credentials-binding
+    - http_request
+    - pipeline-utility-steps
+    - pipeline-groovy-lib
+    - timestamper
+
+  serviceType: ClusterIP
+
+  podLabels:
+    app: jenkins
+    team: idp-demo
+
+  containerEnvFrom:
+    - secretRef:
+        name: harness-idp-secrets
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  sidecars:
+    configAutoReload:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  JCasC:
+    defaultConfig: true
+    configScripts:
+      demo-config: |
+        jenkins:
+          systemMessage: "IDP Custom Integration demo — provisioned via JCasC"
+        credentials:
+          system:
+            domainCredentials:
+              - credentials:
+                  - string:
+                      scope: GLOBAL
+                      id: harness-api-key
+                      secret: "${HARNESS_API_KEY}"
+                      description: "Harness dev PAT (Bearer)"
+                  - string:
+                      scope: GLOBAL
+                      id: harness-account-id
+                      secret: "${HARNESS_ACCOUNT_ID}"
+                      description: "Harness dev account id"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-build
+                      secret: "${IID_BUILD}"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-deployment
+                      secret: "${IID_DEPLOYMENT}"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-quality
+                      secret: "${IID_QUALITY}"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-security
+                      secret: "${IID_SECURITY}"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-security-scan
+                      secret: "${IID_SECURITY_SCAN}"
+                  - string:
+                      scope: GLOBAL
+                      id: iid-custom
+                      secret: "${IID_CUSTOM}"
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: ghcr
+                      username: "${GHCR_USERNAME}"
+                      password: "${GHCR_TOKEN}"
+                      description: "GHCR write:packages token"
+        unclassified:
+          globalLibraries:
+            libraries:
+              - name: idp-lib
+                defaultVersion: demo-setup
+                implicit: false
+                retriever:
+                  modernSCM:
+                    scm:
+                      git:
+                        remote: "https://github.com/deepakbhatt329/demo-spring-app-petclinic.git"
+        jobs:
+          - script: >
+              pipelineJob('petclinic') {
+                definition {
+                  cpsScm {
+                    scm {
+                      git {
+                        remote { url('https://github.com/deepakbhatt329/demo-spring-app-petclinic.git') }
+                        branch('*/demo-setup')
+                      }
+                    }
+                    scriptPath('Jenkinsfile')
+                  }
+                }
+                triggers { scm('H/2 * * * *') }
+              }
+
+agent:
+  enabled: true
+  namespace: custom-integrartion-ipd-demo
+  podRetention: OnFailure
+  podLabels:
+    app: jenkins-agent
+    team: idp-demo
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 8Gi
+
+rbac:
+  create: true
+  readSecrets: true
+
+serviceAccount:
+  create: true
+  name: jenkins
+
+serviceAccountAgent:
+  create: true
+  name: jenkins-agent
