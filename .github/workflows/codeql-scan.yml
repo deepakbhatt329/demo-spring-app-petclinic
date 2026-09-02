@@ -111,7 +111,7 @@ jobs:
               timestamp:  $ts,
               name:       $name,
               entity_ref: $ref,
-              service:    "petclinic",
+              service:    "petclinicdemo",
               toolName:   "codeql",
               url:        $run_url,
               scanResult: {critical: $critical, high: $high, medium: $medium, low: $low},
