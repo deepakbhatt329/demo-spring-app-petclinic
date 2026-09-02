@@ -1,7 +1,6 @@
 # IDP Custom Integration — demo environment bootstrap
 
 This directory contains everything needed to spin up the demo. See `~/.claude/plans/i-want-you-to-kind-diffie.md` for the full plan.
-
 ## Quick start
 
 ```
