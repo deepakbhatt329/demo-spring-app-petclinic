@@ -1,0 +1,135 @@
+name: CodeQL security scan → Harness IDP
+
+on:
+  push:
+    branches: [main, demo-setup]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql-scan:
+    name: CodeQL analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          queries: security-extended
+
+      - name: Build
+        run: ./mvnw -B -DskipTests package
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif-results
+          upload: always
+
+      - name: Count findings by severity
+        id: counts
+        run: |
+          set -euo pipefail
+          SARIF=$(ls sarif-results/*.sarif 2>/dev/null | head -1)
+          if [ -z "${SARIF:-}" ]; then
+            echo "critical=0" >> "$GITHUB_OUTPUT"
+            echo "high=0"     >> "$GITHUB_OUTPUT"
+            echo "medium=0"   >> "$GITHUB_OUTPUT"
+            echo "low=0"      >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          jq -r '
+            [.runs[].results[] |
+              (.properties["security-severity"] // null) as $ss |
+              if $ss != null then
+                ($ss | tonumber) as $score |
+                if   $score >= 9.0 then "critical"
+                elif $score >= 7.0 then "high"
+                elif $score >= 4.0 then "medium"
+                else                    "low"
+                end
+              else
+                (.level // "warning") |
+                if   . == "error"   then "high"
+                elif . == "warning" then "medium"
+                else                     "low"
+                end
+              end
+            ] | group_by(.) | map({(.[0]): length}) | add // {}
+          ' "$SARIF" > counts.json
+
+          echo "critical=$(jq '.critical // 0' counts.json)" >> "$GITHUB_OUTPUT"
+          echo "high=$(jq '.high // 0' counts.json)"         >> "$GITHUB_OUTPUT"
+          echo "medium=$(jq '.medium // 0' counts.json)"     >> "$GITHUB_OUTPUT"
+          echo "low=$(jq '.low // 0' counts.json)"           >> "$GITHUB_OUTPUT"
+
+      - name: POST security_scan to Harness IDP
+        env:
+          HARNESS_IM_URL:     ${{ secrets.HARNESS_IM_URL }}
+          HARNESS_ACCOUNT_ID: ${{ secrets.HARNESS_ACCOUNT_ID }}
+          HARNESS_API_KEY:    ${{ secrets.HARNESS_API_KEY }}
+          IID_SECURITY_SCAN:  ${{ secrets.IID_SECURITY_SCAN }}
+          IDP_ENTITY_REF:     ${{ secrets.IDP_ENTITY_REF }}
+        run: |
+          set -euo pipefail
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          RUN_NUMBER="${{ github.run_number }}"
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+
+          BODY=$(jq -n \
+            --arg id       "codeql-petclinic-${RUN_NUMBER}" \
+            --arg ts       "$TS" \
+            --arg name     "CodeQL scan petclinic #${RUN_NUMBER}" \
+            --arg ref      "$IDP_ENTITY_REF" \
+            --arg run_url  "${REPO_URL}/actions/runs/${{ github.run_id }}" \
+            --arg repo_url "$REPO_URL" \
+            --arg branch   "${{ github.ref_name }}" \
+            --argjson critical ${{ steps.counts.outputs.critical }} \
+            --argjson high     ${{ steps.counts.outputs.high }} \
+            --argjson medium   ${{ steps.counts.outputs.medium }} \
+            --argjson low      ${{ steps.counts.outputs.low }} \
+            '{records:[{
+              identifier: $id,
+              timestamp:  $ts,
+              name:       $name,
+              entity_ref: $ref,
+              service:    "petclinic",
+              toolName:   "codeql",
+              url:        $run_url,
+              scanResult: {critical: $critical, high: $high, medium: $medium, low: $low},
+              target:     {name: "petclinic", type: "Repo", url: $repo_url},
+              tags:       {scanner: "codeql", branch: $branch}
+            }]}')
+
+          echo "--- upsert(security_scan/codeql) payload ---"
+          echo "$BODY" | jq .
+          echo "--- end ---"
+
+          HTTP_CODE=$(curl -sS -o /tmp/im-resp -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${HARNESS_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "${HARNESS_IM_URL}/api/v1/accounts/${HARNESS_ACCOUNT_ID}/integrations/${IID_SECURITY_SCAN}/data/security_scan" \
+            -d "$BODY")
+          echo "IM response (${HTTP_CODE}):"
+          cat /tmp/im-resp; echo
+          [ "$HTTP_CODE" = "202" ] || exit 1

@@ -41,6 +41,12 @@ spec:
       tty: true
       envFrom:
         - secretRef: { name: harness-idp-secrets }
+    - name: owasp-dc
+      image: owasp/dependency-check:latest
+      command: [cat]
+      tty: true
+      envFrom:
+        - secretRef: { name: harness-idp-secrets }
   volumes:
     - name: dockersock
       hostPath: { path: /var/run/docker.sock }
@@ -57,6 +63,8 @@ spec:
     BUILD_ID_STR      = "jenkins-petclinic-${env.BUILD_NUMBER}"
     DEPLOY_ID         = "deploy-petclinic-${env.BUILD_NUMBER}"
     SECURITY_ID_BASE  = "trivy-petclinic-${env.BUILD_NUMBER}"
+    SCAN_ID           = "trivy-scan-petclinic-${env.BUILD_NUMBER}"
+    ODC_SCAN_ID       = "odc-petclinic-${env.BUILD_NUMBER}"
     IMAGE_REPO        = 'ghcr.io/deepakbhatt329/petclinic'
     IMAGE_TAG         = "${env.BUILD_NUMBER}"
     IMAGE             = "${IMAGE_REPO}:${IMAGE_TAG}"
@@ -117,6 +125,28 @@ spec:
       }
     }
 
+    stage('OWASP Dependency-Check') {
+      when { expression { currentBuild.currentResult == 'SUCCESS' } }
+      steps {
+        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE', message: 'ODC_SCAN_FAILED') {
+          container('owasp-dc') {
+            sh '''
+              /usr/share/dependency-check/bin/dependency-check.sh \
+                --project petclinic \
+                --scan target/ \
+                --format JSON \
+                --out odc-report/ \
+                --disableAssembly \
+                --disableNodeJS \
+                --disablePyDist \
+                --disablePyPkg \
+                --disableRubyGems
+            '''
+          }
+        }
+      }
+    }
+
     stage('Trivy scan') {
       when { expression { currentBuild.currentResult == 'SUCCESS' } }
       steps {
@@ -151,6 +181,8 @@ spec:
           tags         : [runner: 'kubernetes', registry: 'ghcr.io']
         ])
         upsertTrivyFindings('trivy.json', env.SECURITY_ID_BASE)
+        upsertTrivyScan('trivy.json', env.SCAN_ID)
+        upsertDepCheckScan('odc-report/dependency-check-report.json', env.ODC_SCAN_ID)
       }
     }
 

@@ -6,6 +6,7 @@ def call(String kind, Map extras) {
     'deployment'     : 'iid-deployment',
     'quality'        : 'iid-quality',
     'security_issues': 'iid-security',
+    'security_scan'  : 'iid-security-scan',
     'custom'         : 'iid-custom'
   ][kind]
   if (!iidCredId) {
