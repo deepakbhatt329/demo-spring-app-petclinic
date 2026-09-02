@@ -2,9 +2,8 @@ name: CodeQL security scan → Harness IDP
 
 on:
   push:
-    branches: [main, demo-setup]
+    branches: [demo-setup]
   pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch: {}
 
 concurrency:
