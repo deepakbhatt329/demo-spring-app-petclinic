@@ -10,7 +10,6 @@ See the presentation here:
 > **Note:** These slides refer to a legacy, pre–Spring Boot version of Petclinic and may not reflect the current Spring Boot–based implementation.  
 > For up-to-date information, please refer to this repository and its documentation.
 
-
 ## Run Petclinic locally
 
 Spring Petclinic is a [Spring Boot](https://spring.io/guides/gs/spring-boot) application built using [Maven](https://spring.io/guides/gs/maven/) or [Gradle](https://spring.io/guides/gs/gradle/).
@@ -41,7 +40,6 @@ You can, of course, run Petclinic in your favorite IDE.
 See below for more details.
 
 ## Building a Container
-
 There is no `Dockerfile` in this project. You can build a container image (if you have a docker daemon) using the Spring Boot build plugin:
 
 ## Running the Container Image

@@ -1,6 +1,15 @@
 import groovy.json.JsonOutput
 
-def call(String trivyJsonPath, String idBase) {
+def call(String trivyJsonPath, String idBase, Map opts = [:]) {
+  def defaults = [
+    status  : 'OPEN',
+    type    : 'VULNERABILITY',
+    rule    : 'trivy:cve',
+    toolName: 'trivy',
+    service : 'petclinic',
+    tags    : [scanner: 'trivy']
+  ]
+  def cfg = defaults + opts
   if (!fileExists(trivyJsonPath)) {
     echo "No trivy report at ${trivyJsonPath} — skipping security_issues upsert."
     return
@@ -15,20 +24,20 @@ def call(String trivyJsonPath, String idBase) {
   (report.Results ?: []).each { result ->
     (result.Vulnerabilities ?: []).each { v ->
       records << [
-        identifier    : "${idBase}-${v.VulnerabilityID}",
+        identifier    : "${idBase}-${v.VulnerabilityID}-${env.BUILD_NUMBER}",
         name          : "${v.VulnerabilityID} in ${v.PkgName}",
         timestamp     : env.ISO_TS,
-        service       : 'petclinic',
+        service       : cfg.service,
         entity_ref    : env.IDP_ENTITY_REF,
         url           : v.PrimaryURL ?: '',
         severity      : (v.Severity ?: 'MEDIUM'),
-        status        : 'OPEN',
-        type          : 'VULNERABILITY',
-        rule          : 'trivy:cve',
+        status        : cfg.status,
+        type          : cfg.type,
+        rule          : cfg.rule,
         cve           : v.VulnerabilityID,
         packageVersion: "${v.PkgName}@${v.InstalledVersion}",
-        toolName      : 'trivy',
-        tags          : [scanner: 'trivy', pkgType: (result.Type ?: 'unknown')]
+        toolName      : cfg.toolName,
+        tags          : cfg.tags + [pkgType: (result.Type ?: 'unknown')]
       ]
     }
   }
@@ -38,14 +47,14 @@ def call(String trivyJsonPath, String idBase) {
       identifier    : "${idBase}-clean",
       name          : "Trivy scan clean for petclinic #${env.BUILD_NUMBER}",
       timestamp     : env.ISO_TS,
-      service       : 'petclinic',
+      service       : cfg.service,
       entity_ref    : env.IDP_ENTITY_REF,
       severity      : 'INFO',
       status        : 'RESOLVED',
-      type          : 'VULNERABILITY',
+      type          : cfg.type,
       rule          : 'trivy:scan-clean',
-      toolName      : 'trivy',
-      tags          : [scanner: 'trivy']
+      toolName      : cfg.toolName,
+      tags          : cfg.tags
     ]
     echo "Trivy report contained no vulnerabilities — posting scan-clean marker record."
   }
